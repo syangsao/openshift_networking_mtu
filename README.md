@@ -105,11 +105,14 @@ Look for `maxmtu` in the output — it should be 65535 (or at least 9000).
 ### Find Primary Interface
 
 ```bash
-# List OVS ports to find the external bridge physical interface
-oc debug node/<node_name> -- chroot /host ovs-vsctl list-ports ovs-system
+# List OVS bridges first
+oc debug node/<node_name> -- chroot /host ovs-vsctl list-br
+
+# Then list ports on the relevant bridge (e.g. br-ex for external)
+oc debug node/<node_name> -- chroot /host ovs-vsctl list-ports <bridge_name>
 ```
 
-Pick the port connected to `br-ex` (external bridge). Returns the VLAN subinterface name (e.g., `bond0.40`). The **bond** interface (`bond0`) is what needs the MTU change.
+Pick the port connected to your external bridge. Returns the VLAN subinterface name (e.g., `bond0.40`). The **bond** interface (`bond0`) is what needs the MTU change.
 
 ### Check Current MTU
 
@@ -479,8 +482,9 @@ oc debug node/<node_name> -- chroot /host ip -d link show eno2
 # List all network interfaces to find OVS and Geneve tunnels
 oc debug node/<node_name> -- chroot /host ip link show | grep -i -E "bond|geneve|ovs|eno"
 
-# Check OVS bridge and port MTUs (interface names vary by cluster)
-oc debug node/<node_name> -- chroot /host ovs-vsctl list-ports ovs-system
+# Discover OVS bridges and their ports
+oc debug node/<node_name> -- chroot /host ovs-vsctl list-br
+oc debug node/<node_name> -- chroot /host ovs-vsctl list-ports <bridge_name>
 oc debug node/<node_name> -- chroot /host ovs-vsctl get Interface <ovs_port_name> mtu
 ```
 
