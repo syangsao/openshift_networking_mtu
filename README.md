@@ -428,24 +428,25 @@ Expected:
 Use `oc debug` to check live interface state instead:
 
 ```bash
-# Check the OVS physical interface MTU (runtime value)
-oc debug node/<node_name> -- chroot /host ovs-vsctl get Interface ovs-if-phys0 mtu
-
 # Check the bond interface MTU (runtime value)
 oc debug node/<node_name> -- chroot /host ip -d link show bond0
 
 # Check the Geneve overlay interface MTU
 oc debug node/<node_name> -- chroot /host ip -d link show geneve_sys
+
+# Discover OVS interface names and check their MTU
+# (interface names vary by cluster — use list-interfaces to find them)
+oc debug node/<node_name> -- chroot /host ovs-vsctl list-interfaces
+oc debug node/<node_name> -- chroot /host ovs-vsctl get Interface <ovs_iface> mtu
 ```
 
 Expected:
 ```
-ovs-vsctl: 8900
 bond0: mtu 9000
 geneve_sys: mtu 8900
 ```
 
-> **Note:** The OVS bridge MTU (8900) is the cluster network MTU. The bond interface MTU (9000) is the hardware MTU. The 100-byte difference accounts for OVN-Kubernetes overlay overhead (Geneve header).
+> **Note:** The OVS bridge MTU (8900) is the cluster network MTU. The bond interface MTU (9000) is the hardware MTU. The 100-byte difference accounts for OVN-Kubernetes overlay overhead (Geneve header). OVS interface names vary by cluster — use `ovs-vsctl list-interfaces` to discover them.
 
 ---
 
