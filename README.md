@@ -105,10 +105,11 @@ Look for `maxmtu` in the output — it should be 65535 (or at least 9000).
 ### Find Primary Interface
 
 ```bash
-oc debug node/<node_name> -- chroot /host nmcli -g connection.interface-name c show ovs-if-phys0
+# List OVS ports to find the external bridge physical interface
+oc debug node/<node_name> -- chroot /host ovs-vsctl list-ports ovs-system
 ```
 
-Returns the VLAN subinterface name (e.g., `bond0.40`). The **bond** interface (`bond0`) is what needs the MTU change.
+Pick the port connected to `br-ex` (external bridge). Returns the VLAN subinterface name (e.g., `bond0.40`). The **bond** interface (`bond0`) is what needs the MTU change.
 
 ### Check Current MTU
 
