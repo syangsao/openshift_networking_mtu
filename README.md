@@ -51,42 +51,44 @@ The MTU must be set on **`bond0`** (the bond interface) **and** its slave physic
 
 Butane is Red Hat's configuration transpiler for MachineConfig objects. Select the correct version for your OCP release:
 
-| OCP Version | Butane Version | Release |
-|---|---|---|
-| 4.20 | v0.25.0 | [Release](https://github.com/coreos/butane/releases/tag/v0.25.0) |
-| 4.21 | v0.26.0 | [Release](https://github.com/coreos/butane/releases/tag/v0.26.0) |
-| 4.22 | v0.28.0 | [Release](https://github.com/coreos/butane/releases/tag/v0.28.0) |
+| OCP Version | Butane Version | Ignition Version | Release |
+|---|---|---|---|
+| 4.20 | v0.25.0 | 3.4.0 | [Release](https://github.com/coreos/butane/releases/tag/v0.25.0) |
+| 4.21 | v0.26.0 | 3.5.0 | [Release](https://github.com/coreos/butane/releases/tag/v0.26.0) |
+| 4.22 | v0.26.0 | 3.5.0 | [Release](https://github.com/coreos/butane/releases/tag/v0.26.0) |
 
-Download the binary for your platform (example for OCP 4.22 / Butane v0.28.0):
+> **⚠️ CRITICAL:** OCP 4.22's Machine Config Operator supports Ignition up to **3.5**. Butane v0.28.0 generates Ignition 3.6 which will **fail** with `parsing Ignition config failed: unknown version`. Use **v0.26.0** for OCP 4.22.
+
+Download the binary for your platform (example for OCP 4.22 / Butane v0.26.0):
 
 ```bash
 # Linux x86_64
-curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.28.0/butane-x86_64-unknown-linux-gnu
+curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.26.0/butane-x86_64-unknown-linux-gnu
 
 # Linux aarch64
-# curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.28.0/butane-aarch64-unknown-linux-gnu
+# curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.26.0/butane-aarch64-unknown-linux-gnu
 
 # Linux ppc64le
-# curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.28.0/butane-ppc64le-unknown-linux-gnu
+# curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.26.0/butane-ppc64le-unknown-linux-gnu
 
 # Linux s390x
-# curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.28.0/butane-s390x-unknown-linux-gnu
+# curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.26.0/butane-s390x-unknown-linux-gnu
 
 # macOS Intel (x86_64)
-# curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.28.0/butane-x86_64-apple-darwin
+# curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.26.0/butane-x86_64-apple-darwin
 
 # macOS Apple Silicon (aarch64)
-# curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.28.0/butane-aarch64-apple-darwin
+# curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.26.0/butane-aarch64-apple-darwin
 
 # Windows x86_64 (replace .exe extension)
-# curl -Lo /tmp/butane.exe https://github.com/coreos/butane/releases/download/v0.28.0/butane-x86_64-pc-windows-gnu.exe
+# curl -Lo /tmp/butane.exe https://github.com/coreos/butane/releases/download/v0.26.0/butane-x86_64-pc-windows-gnu.exe
 
 chmod +x /tmp/butane
 sudo mv /tmp/butane /usr/local/bin/butane
 butane --version
 ```
 
-> **Note:** The Butane version must match your OCP major.minor version. Earlier versions do not support newer specs.
+> **Note:** Use Butane v0.26.0 with `version: 4.21.0` in your Butane source files for OCP 4.22. This generates Ignition 3.5 which is the highest version OCP 4.22's MCO supports.
 
 ### Verify Switch Port MTU
 
@@ -160,7 +162,7 @@ Save as `control-plane-interface.bu`:
 
 ```yaml
 variant: openshift
-version: 4.22.0
+version: 4.21.0
 metadata:
   name: 01-control-plane-interface
   labels:
@@ -179,7 +181,7 @@ Save as `worker-interface.bu`:
 
 ```yaml
 variant: openshift
-version: 4.22.0
+version: 4.21.0
 metadata:
   name: 01-worker-interface
   labels:
@@ -192,7 +194,7 @@ storage:
       mode: 0600
 ```
 
-> **Important:** The Butane `version` must match your OCP version and always ends in `.0` (e.g., `4.22.0`).
+> **Important:** Use `version: 4.21.0` even on OCP 4.22. Butane v0.26.0 with this version generates Ignition 3.5, which is the highest Ignition version OCP 4.22's MCO supports. Using `4.22.0` with Butane v0.28.0 generates Ignition 3.6 which will fail.
 
 ---
 
