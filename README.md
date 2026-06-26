@@ -46,7 +46,31 @@ The MTU must be set on **`bond0`** (the bond interface), not on individual VLAN 
 - `oc` CLI installed
 - Cluster-admin access to the cluster
 - Physical network switches supporting jumbo frames (MTU 9000) on the ports where cluster nodes are connected
-- `butane` installed for generating MachineConfig YAMLs
+
+### Download Butane
+
+Butane is Red Hat's configuration transpiler for MachineConfig objects. For OCP 4.22, use **Butane v0.28.0** (stabilizes OpenShift spec 4.22.0).
+
+```bash
+# Download the appropriate binary for your platform
+# Linux amd64:
+curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.28.0/butane-amd64-linux
+
+# Linux arm64:
+# curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.28.0/butane-arm64-linux
+
+# macOS (Intel):
+# curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.28.0/butane-amd64-macos
+
+# macOS (Apple Silicon):
+# curl -Lo /tmp/butane https://github.com/coreos/butane/releases/download/v0.28.0/butane-arm64-macos
+
+chmod +x /tmp/butane
+sudo mv /tmp/butane /usr/local/bin/butane
+butane --version
+```
+
+> **Note:** Butane v0.28.0 is required for OCP 4.22. Earlier versions do not support the 4.22.0 spec. The Butane version must match your OCP major.minor version (e.g., v0.25.0 for OCP 4.20, v0.26.0 for OCP 4.21, v0.28.0 for OCP 4.22).
 
 ### Verify Switch Port MTU
 
