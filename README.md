@@ -423,13 +423,26 @@ Expected:
 
 ### Verify OVN-Kubernetes MTU
 
+`oc adm node-logs` queries the `ovs-configuration` systemd journal, which is written once at node boot and does not update after NetworkManager reconfigures interfaces. Those logs will show the historical MTU from the initial boot, not the current runtime value.
+
+Use `oc debug` to check live interface state instead:
+
 ```bash
-oc adm node-logs <node_name> -u ovs-configuration | grep configure-ovs.sh | grep mtu | grep bond0 | head -1
+# Check the OVS physical interface MTU (runtime value)
+oc debug node/<node_name> -- chroot /host ovs-vsctl get Interface ovs-if-phys0 mtu
+
+# Check the bond interface MTU (runtime value)
+oc debug node/<node_name> -- chroot /host ip -d link show bond0
+
+# Check the Geneve overlay interface MTU
+oc debug node/<node_name> -- chroot /host ip -d link show geneve_sys
 ```
 
 Expected:
 ```
-bond0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8900
+ovs-vsctl: 8900
+bond0: mtu 9000
+geneve_sys: mtu 8900
 ```
 
 > **Note:** The OVS bridge MTU (8900) is the cluster network MTU. The bond interface MTU (9000) is the hardware MTU. The 100-byte difference accounts for OVN-Kubernetes overlay overhead (Geneve header).
@@ -483,14 +496,15 @@ oc get machineconfig | grep -E "rendered-|99_"
 If pods lose connectivity after a reboot:
 
 ```bash
-# Verify bond interface MTU
+# Verify bond interface MTU (runtime)
 oc debug node/<node_name> -- chroot /host ip link show bond0
 
-# Verify OVS bridge MTU
+# Verify OVS bridge MTU (runtime)
 oc debug node/<node_name> -- chroot /host ovs-vsctl get Interface ovs-if-phys0 mtu
 
-# Check OVN configuration
-oc adm node-logs <node_name> -u ovs-configuration | grep mtu
+# ⚠️ Note: oc adm node-logs queries the ovs-configuration journal which is
+# written once at boot and does NOT reflect runtime MTU changes from NetworkManager.
+# Use oc debug instead for live values.
 ```
 
 ### Rollback
