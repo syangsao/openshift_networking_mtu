@@ -1,0 +1,12 @@
+variant: openshift
+version: 4.22.0
+metadata:
+  name: 01-worker-interface
+  labels:
+    machineconfiguration.openshift.io/role: worker
+storage:
+  files:
+    - path: /etc/NetworkManager/conf.d/99-bond0-mtu.conf
+      contents:
+        local: bond0-mtu.conf
+      mode: 0600
