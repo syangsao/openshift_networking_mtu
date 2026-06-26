@@ -306,6 +306,46 @@ Expected: `ExecStart=/usr/local/bin/mtu-migration.sh`
 
 ---
 
+## Step 6.5: Verify MachineConfigs Are Present
+
+Before proceeding, confirm the MachineConfig objects exist and contain the correct content.
+
+### Check MachineConfig Exists
+
+```bash
+oc get machineconfig 01-control-plane-interface -o yaml
+oc get machineconfig 01-worker-interface -o yaml
+```
+
+### Verify File Content
+
+The `spec.config.storage.files[0].contents.source` field contains a gzip-compressed base64-encoded NetworkManager config. Decode and inspect it:
+
+```bash
+# Extract the base64 content and decode it
+oc get machineconfig 01-control-plane-interface -o jsonpath='{.spec.config.storage.files[0].contents.source}' | \
+  sed 's|data:;base64,||' | base64 -d | gunzip
+```
+
+Expected output:
+```
+[connection-bond0-mtu]
+match-device=interface-name:bond0
+ethernet.mtu=9000
+
+[connection-eno1-mtu]
+match-device=interface-name:eno1
+ethernet.mtu=9000
+
+[connection-eno2-mtu]
+match-device=interface-name:eno2
+ethernet.mtu=9000
+```
+
+> **Note:** If the decoded content does not match, delete and recreate the MachineConfig before proceeding.
+
+---
+
 ## Step 7: Apply the MachineConfigs (Hardware MTU)
 
 Now apply the MachineConfig objects that set the MTU to 9000 on **both the physical interfaces (`eno1`, `eno2`) and the bond interface (`bond0`)** via NetworkManager. This triggers the second rolling reboot.
@@ -462,6 +502,7 @@ eno2: mtu 9000
 | **Step 4** | Start migration (1st reboot) | `oc patch` with migration spec |
 | **Step 5** | Wait for nodes to update | `oc get machineconfigpools` |
 | **Step 6** | Verify migration script | `oc get machineconfig <name>` + `grep ExecStart` |
+| **Step 6.5** | Verify MachineConfig content | `oc get machineconfig ... \| base64 -d \| gunzip` |
 | **Step 7** | Apply hardware MTU (2nd reboot) | `oc create -f *.yaml` |
 | **Step 8** | Wait for nodes to update | `oc get machineconfigpools` |
 | **Step 9** | Finalize OVN-Kubernetes (3rd reboot) | `oc patch` with `migration: null` |
@@ -504,12 +545,7 @@ If pods lose connectivity after a reboot:
 # Verify bond interface MTU (runtime)
 oc debug node/<node_name> -- chroot /host ip link show bond0
 
-# Verify OVS bridge MTU (runtime)
-oc debug node/<node_name> -- chroot /host ovs-vsctl get Interface ovs-if-phys0 mtu
-
-# ⚠️ Note: oc adm node-logs queries the ovs-configuration journal which is
-# written once at boot and does NOT reflect runtime MTU changes from NetworkManager.
-# Use oc debug instead for live values.
+# ⚠️ Note: OVS interface names vary by cluster — use 'ip link show | grep -iE geneve|ovs' to find them
 ```
 
 ### Rollback
