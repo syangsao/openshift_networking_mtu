@@ -37,7 +37,7 @@ eno1 ─┐
 eno2 ─┘
 ```
 
-The MTU must be set on **`bond0`** (the bond interface), not on individual VLAN subinterfaces. The bond carries traffic across both physical links (`eno1` + `eno2`).
+The MTU must be set on **`bond0`** (the bond interface) **and** its slave physical interfaces (**`eno1`**, **`eno2`**), not on individual VLAN subinterfaces. The bond carries traffic across both physical links (`eno1` + `eno2`); both must be configured for jumbo frames.
 
 ---
 
@@ -128,17 +128,25 @@ All pools should show `UPDATED=true`, `UPDATING=false`, `DEGRADED=false` before 
 
 ## Step 1: Create NetworkManager Config File
 
-Create a NetworkManager configuration file that sets the MTU on the bond interface.
+Create a NetworkManager configuration file that sets the MTU on the bond interface **and** its physical slave interfaces (`eno1`, `eno2`).
 
 ```bash
 cat > bond0-mtu.conf << 'EOF'
 [connection-bond0-mtu]
 match-device=interface-name:bond0
 ethernet.mtu=9000
+
+[connection-eno1-mtu]
+match-device=interface-name:eno1
+ethernet.mtu=9000
+
+[connection-eno2-mtu]
+match-device=interface-name:eno2
+ethernet.mtu=9000
 EOF
 ```
 
-> **Note:** The file name (`bond0-mtu.conf`) is arbitrary — it's the content that matters. The `match-device` directive targets the `bond0` interface specifically.
+> **Note:** The file name (`bond0-mtu.conf`) is arbitrary — it's the content that matters. The `match-device` directive targets `bond0`, `eno1`, and `eno2` specifically. **Both the physical interfaces and the bond must have MTU set** — the bond's effective MTU is limited by its lowest-slave MTU, so jumbo frames will not work if only bond0 is configured.
 
 ---
 
@@ -298,7 +306,7 @@ Expected: `ExecStart=/usr/local/bin/mtu-migration.sh`
 
 ## Step 7: Apply the MachineConfigs (Hardware MTU)
 
-Now apply the MachineConfig objects that set the bond interface MTU to 9000 via NetworkManager. This triggers the second rolling reboot.
+Now apply the MachineConfig objects that set the MTU to 9000 on **both the physical interfaces (`eno1`, `eno2`) and the bond interface (`bond0`)** via NetworkManager. This triggers the second rolling reboot.
 
 ```bash
 for manifest in control-plane-interface worker-interface; do
@@ -311,7 +319,7 @@ done
 1. MCO picks up the new MachineConfig objects
 2. MCO generates new rendered configs for each pool
 3. MCO performs a rolling reboot of each node
-4. On reboot, NetworkManager applies the new MTU (9000) to `bond0`
+4. On reboot, NetworkManager applies the new MTU (9000) to `eno1`, `eno2`, and `bond0`
 
 ---
 
@@ -326,15 +334,22 @@ Wait until all pools show:
 - `UPDATING=false`
 - `DEGRADED=false`
 
-### Verify Bond MTU
+### Verify Bond and Physical Interface MTU
 
-After the reboot, verify the bond interface has the new MTU:
+After the reboot, verify the bond and physical interfaces have the new MTU:
 
 ```bash
 oc debug node/<node_name> -- chroot /host ip -d link show bond0
+oc debug node/<node_name> -- chroot /host ip -d link show eno1
+oc debug node/<node_name> -- chroot /host ip -d link show eno2
 ```
 
-Expected: `bond0 ... mtu 9000`
+Expected:
+```
+bond0 ... mtu 9000
+eno1 ... mtu 9000
+eno2 ... mtu 9000
+```
 
 ---
 
@@ -493,4 +508,4 @@ You cannot roll back during the migration process. After the migration completes
 - **Three rolling reboots** — expect significant downtime during the process
 - **Physical switches must support jumbo frames** — verify before starting
 - **The MTU value of 100 bytes** — this is the OVN-Kubernetes Geneve overlay overhead. For other network plugins, this value may differ.
-- **Bond interface, not VLAN** — set MTU on `bond0`, not on individual VLAN subinterfaces like `bond0.40`
+- **Bond interface and physical interfaces** — set MTU on `bond0` **and** its slave interfaces (`eno1`, `eno2`). The bond's effective MTU is bounded by its lowest-slave MTU; jumbo frames will not work if only bond0 is configured.
