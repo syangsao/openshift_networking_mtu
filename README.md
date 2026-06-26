@@ -397,6 +397,25 @@ eno1 ... mtu 9000
 eno2 ... mtu 9000
 ```
 
+### Verify Rendered MachineConfig Includes the MTU Config
+
+Confirm that MCO's rendered config for each node actually includes the NetworkManager MTU file. This verifies the MachineConfig was incorporated into the node's boot configuration.
+
+```bash
+# Get the rendered config name from a node
+oc describe node <node_name> | grep machineconfiguration.openshift.io/currentConfig
+
+# Check the rendered config includes the 99-bond0-mtu.conf file
+oc get machineconfig <rendered_config_name> -o jsonpath='{.spec.config.storage.files[*].path}' | tr ' ' '\n' | grep bond0
+```
+
+Expected output:
+```
+/etc/NetworkManager/conf.d/99-bond0-mtu.conf
+```
+
+> **Note:** If the file path does not appear in the rendered config, the MachineConfig was not incorporated. Check MCO logs and the MachineConfigPool status before proceeding.
+
 ---
 
 ## Step 9: Finalize the MTU Migration
@@ -510,6 +529,7 @@ eno2: mtu 9000
 | **Step 6.5** | Verify MachineConfig content | `oc get machineconfig ... \| base64 -d \| gunzip` |
 | **Step 7** | Apply hardware MTU (2nd reboot) | `oc create -f *.yaml` |
 | **Step 8** | Wait for nodes to update | `oc get machineconfigpools` |
+| **Step 8.5** | Verify rendered config | `oc get machineconfig <rendered> \| grep bond0` |
 | **Step 9** | Finalize OVN-Kubernetes (3rd reboot) | `oc patch` with `migration: null` |
 | **Step 10** | Verify final state | `oc describe network.config cluster` |
 
