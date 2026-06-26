@@ -423,29 +423,34 @@ Expected:
 
 ### Verify OVN-Kubernetes MTU
 
-`oc adm node-logs` queries the `ovs-configuration` systemd journal, which is written once at node boot and does not update after NetworkManager reconfigures interfaces. Those logs will show the historical MTU from the initial boot, not the current runtime value.
+`oc adm node-logs` queries the `ovs-configuration` systemd journal, which is written once at node boot and does not update after NetworkManager reconfigures interfaces. Those logs show historical MTU, not runtime values.
 
-Use `oc debug` to check live interface state instead:
+OVS interface names and Geneve tunnel names vary by cluster and deployment. Use `oc debug` to check live interface state:
 
 ```bash
-# Check the OVS physical interface MTU (runtime value)
-oc debug node/<node_name> -- chroot /host ovs-vsctl get Interface ovs-if-phys0 mtu
-
-# Check the bond interface MTU (runtime value)
+# Primary verification — check the bond interface MTU (runtime value)
 oc debug node/<node_name> -- chroot /host ip -d link show bond0
 
-# Check the Geneve overlay interface MTU
-oc debug node/<node_name> -- chroot /host ip -d link show geneve_sys
+# Check the physical slave interfaces
+oc debug node/<node_name> -- chroot /host ip -d link show eno1
+oc debug node/<node_name> -- chroot /host ip -d link show eno2
+
+# List all network interfaces to find OVS and Geneve tunnels
+oc debug node/<node_name> -- chroot /host ip link show | grep -i -E "bond|geneve|ovs|eno"
+
+# Check OVS bridge and port MTUs (interface names vary by cluster)
+oc debug node/<node_name> -- chroot /host ovs-vsctl list-ports ovs-system
+oc debug node/<node_name> -- chroot /host ovs-vsctl get Interface <ovs_port_name> mtu
 ```
 
 Expected:
 ```
-ovs-vsctl: 8900
 bond0: mtu 9000
-geneve_sys: mtu 8900
+eno1: mtu 9000
+eno2: mtu 9000
 ```
 
-> **Note:** The OVS bridge MTU (8900) is the cluster network MTU. The bond interface MTU (9000) is the hardware MTU. The 100-byte difference accounts for OVN-Kubernetes overlay overhead (Geneve header).
+> **Note:** The bond interface MTU (9000) is the hardware MTU. The OVS overlay MTU (8900) is the cluster network MTU. The 100-byte difference accounts for OVN-Kubernetes overlay overhead (Geneve header). OVS interface names vary by cluster — discover them with `ovs-vsctl list-ports` and `ip link show`.
 
 ---
 
