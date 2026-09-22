@@ -310,46 +310,6 @@ Expected: `ExecStart=/usr/local/bin/mtu-migration.sh`
 
 ---
 
-## Step 6.5: Verify MachineConfigs Are Present
-
-Before proceeding, confirm the MachineConfig objects exist and contain the correct content.
-
-### Check MachineConfig Exists
-
-```bash
-oc get machineconfig 01-control-plane-interface -o yaml
-oc get machineconfig 01-worker-interface -o yaml
-```
-
-### Verify File Content
-
-The `spec.config.storage.files[0].contents.source` field contains a gzip-compressed base64-encoded NetworkManager config. Decode and inspect it:
-
-```bash
-# Extract the base64 content and decode it
-oc get machineconfig 01-control-plane-interface -o jsonpath='{.spec.config.storage.files[0].contents.source}' | \
-  sed 's|data:;base64,||' | base64 -d | gunzip
-```
-
-Expected output:
-```
-[connection-bond0-mtu]
-match-device=interface-name:bond0
-ethernet.mtu=9000
-
-[connection-eno1-mtu]
-match-device=interface-name:eno1
-ethernet.mtu=9000
-
-[connection-eno2-mtu]
-match-device=interface-name:eno2
-ethernet.mtu=9000
-```
-
-> **Note:** If the decoded content does not match, delete and recreate the MachineConfig before proceeding.
-
----
-
 ## Step 7: Apply the MachineConfigs (Hardware MTU)
 
 Now apply the MachineConfig objects that set the MTU to 9000 on **both the physical interfaces (`eno1`, `eno2`) and the bond interface (`bond0`)** via NetworkManager. This triggers the second rolling reboot.
@@ -399,22 +359,63 @@ eno2 ... mtu 9000
 
 ### Verify Rendered MachineConfig Includes the MTU Config
 
-Confirm that MCO's rendered config for each node actually includes the NetworkManager MTU file. This verifies the MachineConfig was incorporated into the node's boot configuration.
+Confirm that MCO's rendered config for each node actually includes the NetworkManager MTU file **and** the migration script. Per Red Hat's verification, a successfully deployed machine config contains both the `/etc/NetworkManager/conf.d/99-bond0-mtu.conf` file path and the `ExecStart=/usr/local/bin/mtu-migration.sh` line.
 
 ```bash
 # Get the rendered config name from a node
 oc describe node <node_name> | grep machineconfiguration.openshift.io/currentConfig
 
-# Check the rendered config includes the 99-bond0-mtu.conf file
-oc get machineconfig <rendered_config_name> -o jsonpath='{.spec.config.storage.files[*].path}' | tr ' ' '\n' | grep bond0
+# Check the rendered config includes the 99-bond0-mtu.conf file and migration script
+oc get machineconfig <rendered_config_name> -o yaml | grep -E "path:|ExecStart"
+```
+
+Expected output (both lines present):
+```
+    path: /etc/NetworkManager/conf.d/99-bond0-mtu.conf
+  ExecStart=/usr/local/bin/mtu-migration.sh
+```
+
+> **Note:** If the file path does not appear in the rendered config, the MachineConfig was not incorporated. Check MCO logs and the MachineConfigPool status before proceeding.
+
+---
+
+## Step 8.5: Verify Applied MachineConfig Content
+
+Now that the MachineConfigs have been applied (Step 7) and all pools are updated (Step 8), confirm the objects exist in the cluster and contain the correct NetworkManager content.
+
+### Check MachineConfig Exists
+
+```bash
+oc get machineconfig 01-control-plane-interface -o yaml
+oc get machineconfig 01-worker-interface -o yaml
+```
+
+### Verify File Content
+
+The `spec.config.storage.files[0].contents.source` field contains a gzip-compressed base64-encoded NetworkManager config. Decode and inspect it:
+
+```bash
+# Extract the base64 content and decode it
+oc get machineconfig 01-control-plane-interface -o jsonpath='{.spec.config.storage.files[0].contents.source}' | \
+  sed 's|data:;base64,||' | base64 -d | gunzip
 ```
 
 Expected output:
 ```
-/etc/NetworkManager/conf.d/99-bond0-mtu.conf
+[connection-bond0-mtu]
+match-device=interface-name:bond0
+ethernet.mtu=9000
+
+[connection-eno1-mtu]
+match-device=interface-name:eno1
+ethernet.mtu=9000
+
+[connection-eno2-mtu]
+match-device=interface-name:eno2
+ethernet.mtu=9000
 ```
 
-> **Note:** If the file path does not appear in the rendered config, the MachineConfig was not incorporated. Check MCO logs and the MachineConfigPool status before proceeding.
+> **Note:** If the decoded content does not match, delete and recreate the MachineConfig before proceeding.
 
 ---
 
@@ -526,10 +527,9 @@ eno2: mtu 9000
 | **Step 4** | Start migration (1st reboot) | `oc patch` with migration spec |
 | **Step 5** | Wait for nodes to update | `oc get machineconfigpools` |
 | **Step 6** | Verify migration script | `oc get machineconfig <name>` + `grep ExecStart` |
-| **Step 6.5** | Verify MachineConfig content | `oc get machineconfig ... \| base64 -d \| gunzip` |
 | **Step 7** | Apply hardware MTU (2nd reboot) | `oc create -f *.yaml` |
 | **Step 8** | Wait for nodes to update | `oc get machineconfigpools` |
-| **Step 8.5** | Verify rendered config | `oc get machineconfig <rendered> \| grep bond0` |
+| **Step 8.5** | Verify applied MachineConfig content | `oc get machineconfig ... \| base64 -d \| gunzip` |
 | **Step 9** | Finalize OVN-Kubernetes (3rd reboot) | `oc patch` with `migration: null` |
 | **Step 10** | Verify final state | `oc describe network.config cluster` |
 
